@@ -75,11 +75,6 @@ namespace NetMQ
                 message.Frames.Insert(0, frameStack.Pop());
             }
 
-            //if (frameStack.Any() && !message.Frames.Any())
-            //{
-            //    message.Frames.Insert(0, frameStack.Pop());
-            //}
-
             while (frameStack.Any())
             {
                 message.Header.Insert(0, frameStack.Pop());

@@ -11,28 +11,42 @@ namespace Service
 {
     class Program
     {
+        private const string Identity = "Winamp";
+
         static void Main(string[] args)
         {
             using (var context = new Context())
             using (var client = context.Socket(SocketType.REP))
-            using (var discovery = context.Socket(SocketType.REQ))
             {
-                client.Identity = Encoding.UTF8.GetBytes("Foobar2000");
+                client.Identity = Encoding.UTF8.GetBytes(Identity);
                 client.Connect("tcp://localhost:5555");
-
-                discovery.Connect("tcp://localhost:5556");
-                discovery.SendMore("svc:add", Encoding.UTF8);
-                discovery.Send("Foobar2000", Encoding.UTF8);
-                discovery.RecvAll();
 
                 var clientPollItem = client.CreatePollItem(IOMultiPlex.POLLIN);
                 var pollItems = new[] { clientPollItem };
 
                 clientPollItem.PollInHandler += PollClient;
 
+                var worker = new Thread(() => HeartbeatThread(context));
+                worker.Start();
+
                 while (true)
                 {
                     context.Poll(pollItems);
+                }
+            }
+        }
+
+        private static void HeartbeatThread(Context context)
+        {
+            using (var heartbeat = context.Socket(SocketType.PUB))
+            {
+                heartbeat.Connect("tcp://localhost:5554");
+
+                while (true)
+                {
+                    heartbeat.Send(Encoding.UTF8.GetBytes(Identity));
+
+                    Thread.Sleep(500);
                 }
             }
         }

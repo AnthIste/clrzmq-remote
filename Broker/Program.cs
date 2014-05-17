@@ -10,27 +10,35 @@ namespace Broker
 {
     class Program
     {
-        private static readonly HashSet<string> ActiveServices = new HashSet<string>();
+        private static readonly Dictionary<string, long> ServiceActivity = new Dictionary<string, long>();
+
+        private const long ActivityThresholdSeconds = 5;
 
         static void Main(string[] args)
         {
             using (var context = new Context())
             using (var backend = context.Socket(SocketType.ROUTER))
             using (var frontend = context.Socket(SocketType.ROUTER))
+            using (var heartbeat = context.Socket(SocketType.SUB))
             using (var discovery = context.Socket(SocketType.ROUTER))
             {
                 backend.Bind("tcp://*:5555");
                 frontend.Bind("tcp://*:6666");
+                heartbeat.Bind("tcp://*:5554");
                 discovery.Bind("tcp://*:5556");
+
+                heartbeat.Subscribe("", Encoding.UTF8);
 
                 var servicesPollItem = backend.CreatePollItem(IOMultiPlex.POLLIN);
                 var clientsPollItem = frontend.CreatePollItem(IOMultiPlex.POLLIN);
+                var heartbeatPollItem = heartbeat.CreatePollItem(IOMultiPlex.POLLIN);
                 var discoveryPollItem = discovery.CreatePollItem(IOMultiPlex.POLLIN);
 
-                var pollItems = new[] { servicesPollItem, clientsPollItem, discoveryPollItem };
+                var pollItems = new[] { servicesPollItem, clientsPollItem, heartbeatPollItem, discoveryPollItem };
 
                 servicesPollItem.PollInHandler += (socket, revents) => SwitchBackToFront(socket, frontend);
                 clientsPollItem.PollInHandler += (socket, revents) => SwitchFrontToBack(socket, backend);
+                heartbeatPollItem.PollInHandler += PollHeartbeatSocket;
                 discoveryPollItem.PollInHandler += PollDiscoverySocket;
 
                 while (true)
@@ -62,36 +70,35 @@ namespace Broker
             var response = backend.RecvMessage();
 
             // Remove previously attached ROUTER id
-            var targetService = response.Unwrap()[0];
+            var respondingService = response.Unwrap()[0];
 
             // TODO: replace with inspection code
-            var requestingClient = response.Unwrap()[0];
-            response.Wrap(requestingClient);
+            var targetClient = response.Unwrap()[0];
+            response.Wrap(targetClient);
 
             Console.WriteLine("Switching {0} -> {1}",
-                Encoding.UTF8.GetString(targetService),
-                Encoding.UTF8.GetString(requestingClient));
+                Encoding.UTF8.GetString(respondingService),
+                Encoding.UTF8.GetString(targetClient));
 
             frontend.SendMessage(response);
+        }
+
+        private static void PollHeartbeatSocket(Socket socket, IOMultiPlex revents)
+        {
+            var request = socket.RecvMessage();
+            var serviceName = Encoding.UTF8.GetString(request.Frames[0]);
+
+            ServiceActivity[serviceName] = DateTime.Now.Ticks;
         }
 
         private static void PollDiscoverySocket(Socket socket, IOMultiPlex revents)
         {
             var request = socket.RecvMessage();
+            var command = Encoding.UTF8.GetString(request.Frames[0]);
 
             Message response;
-            switch (Encoding.UTF8.GetString(request.Frames[0]))
+            switch (command)
             {
-                case "svc:add":
-                    ActiveServices.Add(Encoding.UTF8.GetString(request.Frames[1]));
-                    SvcGenericResponse(out response);
-                    break;
-
-                case "svc:rm":
-                    ActiveServices.Remove(Encoding.UTF8.GetString(request.Frames[1]));
-                    SvcGenericResponse(out response);
-                    break;
-
                 case "svc:getactive":
                     SvcGetActiveResponse(out response);
                     break;
@@ -102,7 +109,6 @@ namespace Broker
             }
 
             response.Wrap(request.Header);
-
             socket.SendMessage(response);
         }
 
@@ -113,10 +119,23 @@ namespace Broker
 
         private static void SvcGetActiveResponse(out Message message)
         {
-            var frames = ActiveServices.Select(Encoding.UTF8.GetBytes).ToList();
+            var activeServices = ServiceActivity
+                .Where(kvp => UpToDate(kvp.Value))
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            var frames = activeServices.Select(Encoding.UTF8.GetBytes).ToList();
             frames.Add(new byte[] { });
 
             message = Message.FromFrames(frames);
+        }
+
+        private static bool UpToDate(long lastUpdateTick)
+        {
+            var currentTime = DateTime.Now.Ticks / TimeSpan.TicksPerSecond;
+            var updateTime = lastUpdateTick / TimeSpan.TicksPerSecond;
+
+            return (currentTime - updateTime) <= ActivityThresholdSeconds;
         }
     }
 }
