@@ -15,9 +15,15 @@ namespace Service
         {
             using (var context = new Context())
             using (var client = context.Socket(SocketType.REP))
+            using (var discovery = context.Socket(SocketType.REQ))
             {
-                client.Identity = Encoding.UTF8.GetBytes("Winamp");
+                client.Identity = Encoding.UTF8.GetBytes("Foobar2000");
                 client.Connect("tcp://localhost:5555");
+
+                discovery.Connect("tcp://localhost:5556");
+                discovery.SendMore("svc:add", Encoding.UTF8);
+                discovery.Send("Foobar2000", Encoding.UTF8);
+                discovery.RecvAll();
 
                 var clientPollItem = client.CreatePollItem(IOMultiPlex.POLLIN);
                 var pollItems = new[] { clientPollItem };

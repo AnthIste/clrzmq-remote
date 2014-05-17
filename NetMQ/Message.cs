@@ -70,10 +70,15 @@ namespace NetMQ
                 Frames = new List<byte[]>()
             };
 
-            while (frameStack.Any() && frameStack.Peek().Length > 0)
+            while (frameStack.Any() && (frameStack.Peek().Length > 0 || !message.Frames.Any()))
             {
                 message.Frames.Insert(0, frameStack.Pop());
             }
+
+            //if (frameStack.Any() && !message.Frames.Any())
+            //{
+            //    message.Frames.Insert(0, frameStack.Pop());
+            //}
 
             while (frameStack.Any())
             {
