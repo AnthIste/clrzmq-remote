@@ -24,51 +24,58 @@ namespace Client
 
                 while (true)
                 {
-                    //{
-                    //    Console.WriteLine("Sending request...");
-
-                    //    var request = Message.FromFrame(Encoding.UTF8.GetBytes("WARTRRGH!"));
-
-                    //    request.Wrap(Encoding.UTF8.GetBytes("Misc header 1"));
-                    //    request.Wrap(Encoding.UTF8.GetBytes("Misc header 2"));
-                    //    request.Wrap(Encoding.UTF8.GetBytes("Winamp"));
-                    //    Debug.Assert(request.Header.Count == 6);
-
-                    //    services.SendMessage(request);
-
-                    //    var response = services.RecvMessage();
-                    //    Debug.Assert(response.Header.Count == 4);
-
-                    //    Console.WriteLine("Response: {0}", Encoding.UTF8.GetString(response.Frames[0]));
-                    //}
-
+                    switch (new Random(DateTime.Now.Millisecond).Next() % 2)
                     {
-                        Console.WriteLine("Checking active services...");
-
-                        var request = Message.FromFrame(Encoding.UTF8.GetBytes("svc:getactive"));
-
-                        discovery.SendMessage(request);
-
-                        var response = discovery.RecvMessage();
-
-                        if (!response.Frames.Any())
-                        {
-                            Console.WriteLine("0 active services");
-                        }
-                        else
-                        {
-                            var serviceNames = response.Frames
-                                .Where(x => x.Length > 0)
-                                .Select(Encoding.UTF8.GetString)
-                                .ToArray();
-
-                            Console.WriteLine("{0} services found:", serviceNames.Length);
-
-                            foreach (var serviceName in serviceNames)
+                        case 0:
                             {
-                                Console.WriteLine(" - {0}", serviceName);
+                                Console.WriteLine("Sending request...");
+
+                                var request = Message.FromFrame(Encoding.UTF8.GetBytes("WARTRRGH!"));
+
+                                request.Wrap(Encoding.UTF8.GetBytes("Misc header 1"));
+                                request.Wrap(Encoding.UTF8.GetBytes("Misc header 2"));
+                                request.Wrap(Encoding.UTF8.GetBytes("Winamp"));
+                                Debug.Assert(request.Header.Count == 6);
+
+                                services.SendMessage(request);
+
+                                var response = services.RecvMessage();
+                                Debug.Assert(response.Header.Count == 4);
+
+                                Console.WriteLine("Response: {0}", Encoding.UTF8.GetString(response.Frames[0]));
                             }
-                        }
+                            break;
+
+                        case 1:
+                            {
+                                Console.WriteLine("Checking active services...");
+
+                                var request = Message.FromFrame(Encoding.UTF8.GetBytes("svc:getactive"));
+
+                                discovery.SendMessage(request);
+
+                                var response = discovery.RecvMessage();
+
+                                if (!response.Frames.Any())
+                                {
+                                    Console.WriteLine("0 active services");
+                                }
+                                else
+                                {
+                                    var serviceNames = response.Frames
+                                        .Where(x => x.Length > 0)
+                                        .Select(Encoding.UTF8.GetString)
+                                        .ToArray();
+
+                                    Console.WriteLine("{0} services found:", serviceNames.Length);
+
+                                    foreach (var serviceName in serviceNames)
+                                    {
+                                        Console.WriteLine(" - {0}", serviceName);
+                                    }
+                                }
+                            }
+                            break;
                     }
 
                     Thread.Sleep(1500);

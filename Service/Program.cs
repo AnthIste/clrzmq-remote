@@ -16,7 +16,7 @@ namespace Service
         static void Main(string[] args)
         {
             using (var context = new Context())
-            using (var client = context.Socket(SocketType.REP))
+            using (var client = context.Socket(SocketType.ROUTER))
             {
                 client.Identity = Encoding.UTF8.GetBytes(Identity);
                 client.Connect("tcp://localhost:5555");
