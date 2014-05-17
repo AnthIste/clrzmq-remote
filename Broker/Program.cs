@@ -24,8 +24,8 @@ namespace Broker
 
                 var pollItems = new[] { servicesPollItem, clientsPollItem };
 
-                servicesPollItem.PollInHandler += (socket, revents) => Switch(socket, frontend);
-                clientsPollItem.PollInHandler += (socket, revents) => Switch(socket, backend);
+                servicesPollItem.PollInHandler += (socket, revents) => SwitchBackToFront(socket, frontend);
+                clientsPollItem.PollInHandler += (socket, revents) => SwitchFrontToBack(socket, backend);
 
                 while (true)
                 {
@@ -34,19 +34,37 @@ namespace Broker
             }
         }
 
-        private static void Switch(Socket from, Socket to)
+        private static void SwitchFrontToBack(Socket from, Socket to)
         {
             var request = Message.FromFrames(from.RecvAll());
 
-            var requestingClient = request.Unwrap()[0]; // Request ROUTER id
-            var targetService = request.Unwrap()[0];    // Target ROUTER id
+            // TODO: replace with inspection code
+            var requestingClient = request.Unwrap()[0];
+            var targetService = request.Unwrap()[0];
+            request.Wrap(targetService);
+            request.Wrap(requestingClient);
 
-            request.Wrap(requestingClient);             // Request ROUTER id
-            request.Wrap(targetService);                // Target ROUTER id
+            request.Wrap(targetService); // Target ROUTER id
 
-            Console.WriteLine("Switching {0}/{1}",
+            Console.WriteLine("Switching {0} -> {1}",
                 Encoding.UTF8.GetString(requestingClient),
                 Encoding.UTF8.GetString(targetService));
+
+            to.SendMessage(request);
+        }
+
+        private static void SwitchBackToFront(Socket from, Socket to)
+        {
+            var request = Message.FromFrames(from.RecvAll());
+
+            // TODO: replace with inspection code
+            var targetService = request.Unwrap()[0];
+            var requestingClient = request.Unwrap()[0];
+            request.Wrap(requestingClient);
+
+            Console.WriteLine("Switching {0} -> {1}",
+                Encoding.UTF8.GetString(targetService),
+                Encoding.UTF8.GetString(requestingClient));
 
             to.SendMessage(request);
         }
