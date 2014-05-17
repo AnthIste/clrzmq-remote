@@ -34,39 +34,39 @@ namespace Broker
             }
         }
 
-        private static void SwitchFrontToBack(Socket from, Socket to)
+        private static void SwitchFrontToBack(Socket frontend, Socket backend)
         {
-            var request = Message.FromFrames(from.RecvAll());
+            var request = frontend.RecvMessage();
 
-            // TODO: replace with inspection code
-            var requestingClient = request.Unwrap()[0];
-            var targetService = request.Unwrap()[0];
-            request.Wrap(targetService);
-            request.Wrap(requestingClient);
+            var requestingClient = request.Unwrap()[0]; // Incoming ROUTER id
+            var targetService = request.Unwrap()[0];    // Outgoing ROUTER id
 
-            request.Wrap(targetService); // Target ROUTER id
+            request.Wrap(requestingClient);             // Preserve existing state
+            request.Wrap(targetService);                // Explicitly attach outgoing ROUTER id
 
             Console.WriteLine("Switching {0} -> {1}",
                 Encoding.UTF8.GetString(requestingClient),
                 Encoding.UTF8.GetString(targetService));
 
-            to.SendMessage(request);
+            backend.SendMessage(request);
         }
 
-        private static void SwitchBackToFront(Socket from, Socket to)
+        private static void SwitchBackToFront(Socket backend, Socket frontend)
         {
-            var request = Message.FromFrames(from.RecvAll());
+            var response = backend.RecvMessage();
+
+            // Remove previously attached ROUTER id
+            var targetService = response.Unwrap()[0];
 
             // TODO: replace with inspection code
-            var targetService = request.Unwrap()[0];
-            var requestingClient = request.Unwrap()[0];
-            request.Wrap(requestingClient);
+            var requestingClient = response.Unwrap()[0];
+            response.Wrap(requestingClient);
 
             Console.WriteLine("Switching {0} -> {1}",
                 Encoding.UTF8.GetString(targetService),
                 Encoding.UTF8.GetString(requestingClient));
 
-            to.SendMessage(request);
+            frontend.SendMessage(response);
         }
     }
 }

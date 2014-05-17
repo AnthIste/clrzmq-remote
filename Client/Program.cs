@@ -33,7 +33,7 @@ namespace Client
                     service.SendMessage(request);
 
                     var response = service.RecvMessage();
-                    Debug.Assert(response.Header.Count == 6);
+                    Debug.Assert(response.Header.Count == 4);
 
                     Console.WriteLine("Response: {0}", Encoding.UTF8.GetString(response.Frames[0]));
 
